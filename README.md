@@ -1,4 +1,4 @@
-# mytest – Minimal Playwright Test Runner
+# Minimal Playwright Test Runner
 
 `mytest` is a **Cypress‑like test runner** built on top of **Playwright + TypeScript**, packaged as a small monorepo:
 
