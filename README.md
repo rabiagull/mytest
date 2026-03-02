@@ -188,4 +188,41 @@ Then rerun:
 cd ../../..
 npm run mytest:run
 ```
+## Configuration
+
+`playwright-test-runner` reads options from `mytest.config.json` in the project root:
+## Tagging & filtering tests
+
+Each test can have `description` and `tags`:
+
+module.exports = {
+  tests: [
+    {
+      name: "example: inline page content",
+      description: "Simple inline HTML check",
+      tags: ["smoke"],
+      fn: async (page) => {
+        // ...
+      }
+    }
+  ]
+};
+Run only tests with a specific tag:
+npm run mytest:run -- --tag smoke
+# or
+mytest run --tag smoke
+
+### CLI options
+
+## CLI options
+
+mytest run [--config mytest.config.json] \
+           [--browser chromium|firefox|webkit] \
+           [--headless true|false] \
+           [--tag <tag>]
+```
+
+At the end of a run, a summary is printed, e.g.:
+
+Summary: 5 passed, 1 failed, 6 total.
 
