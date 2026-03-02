@@ -4,10 +4,13 @@ import fs from "fs";
 import path from "path";
 import { runTest, type TestFn, type TestResult } from "@mytest/core";
 import { writeResults } from "@mytest/reporter";
+import { loadConfig, parseCliArgs, type MyTestConfig } from "./config";
 
 interface DiscoveredTest {
   name: string;
   fn: TestFn;
+  description?: string;
+  tags?: string[];
 }
 
 async function discoverTestFiles(testsDir: string): Promise<string[]> {
@@ -34,27 +37,58 @@ async function loadTestsFromFile(filePath: string): Promise<DiscoveredTest[]> {
       continue;
     }
 
-    const anyTest = t as { name?: unknown; fn?: unknown };
+    const anyTest = t as {
+      name?: unknown;
+      fn?: unknown;
+      description?: unknown;
+      tags?: unknown;
+    };
     const name = anyTest.name;
     const fn = anyTest.fn;
 
     if (typeof name === "string" && typeof fn === "function") {
-      result.push({ name, fn: fn as TestFn });
+      const description = typeof anyTest.description === "string" ? anyTest.description : undefined;
+      const tagsArray =
+        Array.isArray(anyTest.tags) && anyTest.tags.every((tag) => typeof tag === "string")
+          ? (anyTest.tags as string[])
+          : undefined;
+
+      result.push({
+        name,
+        fn: fn as TestFn,
+        description,
+        tags: tagsArray
+      });
     }
   }
 
   return result;
 }
 
+function shouldRunTest(test: DiscoveredTest, cliTags: string[]): boolean {
+  if (cliTags.length === 0) {
+    return true;
+  }
+
+  const testTags = test.tags ?? [];
+  if (testTags.length === 0) {
+    return false;
+  }
+
+  return testTags.some((tag) => cliTags.includes(tag));
+}
+
 async function main(): Promise<void> {
-  const [, , command] = process.argv;
+  const [, , command, ...restArgs] = process.argv;
 
   if (command !== "run") {
-    console.log("Usage: mytest run");
+    console.log("Usage: mytest run [--config mytest.config.json] [--browser chromium|firefox|webkit] [--headless true|false] [--tag smoke]");
     process.exit(1);
   }
 
   const cwd = process.cwd();
+  const cliOptions = parseCliArgs(restArgs);
+  const config: MyTestConfig = loadConfig(cwd, cliOptions.configPath);
   const testsDir = path.resolve(cwd, "tests");
 
   if (!fs.existsSync(testsDir)) {
@@ -82,8 +116,18 @@ async function main(): Promise<void> {
     }
 
     for (const test of tests) {
+      if (!shouldRunTest(test, cliOptions.tags)) {
+        // Skip tests that do not match requested tags.
+        continue;
+      }
+
       console.log(`Running ${test.name} (${relativeFile}) ...`);
-      const result = await runTest(test.name, test.fn);
+      const result = await runTest(test.name, test.fn, {
+        browser: cliOptions.browserOverride ?? config.browser,
+        headless: cliOptions.headlessOverride ?? config.headless,
+        baseUrl: config.baseUrl,
+        artifactsDir: config.artifactsDir
+      });
       allResults.push(result);
 
       const statusLabel = result.status === "passed" ? "PASSED" : "FAILED";
@@ -97,7 +141,15 @@ async function main(): Promise<void> {
     }
   }
 
-  await writeResults(allResults);
+  await writeResults(allResults, {
+    outputDir: config.resultsDir
+  });
+
+  const passedCount = allResults.filter((r) => r.status === "passed").length;
+  const failedCount = allResults.filter((r) => r.status === "failed").length;
+
+  console.log("");
+  console.log(`Summary: ${passedCount} passed, ${failedCount} failed, ${allResults.length} total.`);
 }
 
 main().catch((err: unknown) => {

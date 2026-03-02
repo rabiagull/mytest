@@ -12,4 +12,11 @@ export interface TestResult {
     artifacts: TestArtifacts;
 }
 export type TestFn = (page: Page) => Promise<void> | void;
-export declare function runTest(testName: string, fn: TestFn): Promise<TestResult>;
+export type BrowserName = "chromium" | "firefox" | "webkit";
+export interface RunTestOptions {
+    browser?: BrowserName;
+    headless?: boolean;
+    baseUrl?: string;
+    artifactsDir?: string;
+}
+export declare function runTest(testName: string, fn: TestFn, options?: RunTestOptions): Promise<TestResult>;

@@ -10,17 +10,30 @@ const path_1 = __importDefault(require("path"));
 function sanitizeTestName(name) {
     return name.replace(/[^a-zA-Z0-9-_]/g, "_");
 }
-async function runTest(testName, fn) {
+async function runTest(testName, fn, options = {}) {
+    var _a, _b, _c;
     const startedAt = Date.now();
     const errors = [];
     const artifacts = {};
-    const artifactsRoot = path_1.default.resolve(process.cwd(), "artifacts", sanitizeTestName(testName));
+    const artifactsRoot = path_1.default.resolve(process.cwd(), (_a = options.artifactsDir) !== null && _a !== void 0 ? _a : "artifacts", sanitizeTestName(testName));
     let browser;
     let context;
     let page;
     try {
-        browser = await playwright_1.chromium.launch();
-        context = await browser.newContext();
+        const browserName = (_b = options.browser) !== null && _b !== void 0 ? _b : "chromium";
+        const headless = (_c = options.headless) !== null && _c !== void 0 ? _c : true;
+        if (browserName === "firefox") {
+            browser = await playwright_1.firefox.launch({ headless });
+        }
+        else if (browserName === "webkit") {
+            browser = await playwright_1.webkit.launch({ headless });
+        }
+        else {
+            browser = await playwright_1.chromium.launch({ headless });
+        }
+        context = await browser.newContext({
+            baseURL: options.baseUrl
+        });
         page = await context.newPage();
         page.on("pageerror", (error) => {
             const message = error && typeof error === "object" && "message" in error

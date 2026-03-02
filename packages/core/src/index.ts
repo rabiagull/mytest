@@ -1,4 +1,11 @@
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import {
+  chromium,
+  firefox,
+  webkit,
+  type Browser,
+  type BrowserContext,
+  type Page
+} from "playwright";
 import fs from "fs/promises";
 import path from "path";
 
@@ -23,19 +30,48 @@ function sanitizeTestName(name: string): string {
   return name.replace(/[^a-zA-Z0-9-_]/g, "_");
 }
 
-export async function runTest(testName: string, fn: TestFn): Promise<TestResult> {
+export type BrowserName = "chromium" | "firefox" | "webkit";
+
+export interface RunTestOptions {
+  browser?: BrowserName;
+  headless?: boolean;
+  baseUrl?: string;
+  artifactsDir?: string;
+}
+
+export async function runTest(
+  testName: string,
+  fn: TestFn,
+  options: RunTestOptions = {}
+): Promise<TestResult> {
   const startedAt = Date.now();
   const errors: string[] = [];
   const artifacts: TestArtifacts = {};
-  const artifactsRoot = path.resolve(process.cwd(), "artifacts", sanitizeTestName(testName));
+  const artifactsRoot = path.resolve(
+    process.cwd(),
+    options.artifactsDir ?? "artifacts",
+    sanitizeTestName(testName)
+  );
 
   let browser: Browser | undefined;
   let context: BrowserContext | undefined;
   let page: Page | undefined;
 
   try {
-    browser = await chromium.launch();
-    context = await browser.newContext();
+    const browserName: BrowserName = options.browser ?? "chromium";
+    const headless = options.headless ?? true;
+
+    if (browserName === "firefox") {
+      browser = await firefox.launch({ headless });
+    } else if (browserName === "webkit") {
+      browser = await webkit.launch({ headless });
+    } else {
+      browser = await chromium.launch({ headless });
+    }
+
+    context = await browser.newContext({
+      baseURL: options.baseUrl
+    });
     page = await context.newPage();
 
     page.on("pageerror", (error) => {

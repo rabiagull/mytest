@@ -2,6 +2,8 @@ module.exports = {
   tests: [
     {
       name: "example: inline page content",
+      description: "Simple inline HTML check",
+      tags: ["smoke"],
       fn: async (page) => {
         await page.setContent(`
           <html>
